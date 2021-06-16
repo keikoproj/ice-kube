@@ -67,7 +67,7 @@ func (k *Client) ListV1ReplicaSets(ctx context.Context, labelKey string, labelVa
 	for i, repl := range repList.Items {
 		revision, _ := strconv.Atoi(repl.Annotations["deployment.kubernetes.io/revision"])
 		for _, own := range repl.OwnerReferences {
-			if repl.OwnerReferences[0].Kind == "Deployment" {
+			if repl.OwnerReferences[0].Kind == "Deployment" && *repl.Spec.Replicas != 0 {
 				if val, ok := unique[own.Name]; ok {
 					if val.Revision < revision {
 						// Revision comparision for existing
