@@ -82,7 +82,7 @@ func (s *Server) SuspendWorkLoad(ctx context.Context) error {
 				log.WithField("error", err.Error()).Error("unable to get the deployments")
 				return err
 			}
-			if err := s.K8sClient.ScaleV1Deployments(ctx, depl, 0); err != nil {
+			if err := s.K8sClient.ScaleV1Deployments(ctx, depl, 0, "true"); err != nil {
 				log.WithField("error", err.Error()).Error("unable to scale the deployments")
 				return err
 			}
