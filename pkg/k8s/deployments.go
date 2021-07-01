@@ -48,12 +48,13 @@ func (k *Client) GetV1Deployment(ctx context.Context, ns string, name string) (*
 }
 
 //ScaleDownV1Deployments scales down to the requested replica count
-func (k *Client) ScaleV1Deployments(ctx context.Context, depl *v1.Deployment, replicas int) error {
+func (k *Client) ScaleV1Deployments(ctx context.Context, depl *v1.Deployment, replicas int, value string) error {
 	log := log.Logger(ctx)
 	log.Debug("Start ScaleDownV1Deployments")
 
 	//Prepare the patch to make replica count to desired
-	patchStr := fmt.Sprintf(`{"spec":{"replicas": %d }}`, replicas)
+
+	patchStr := fmt.Sprintf(`{"spec":{"replicas": %d, "template": {"metadata":{"labels":{"icekube.kubernetes.io/frozen": "%s"}}}}}`, replicas, value)
 	if err := k.runtimeClient.Patch(context.Background(), &v1.Deployment{
 		ObjectMeta: depl.ObjectMeta,
 	}, client.RawPatch(types.StrategicMergePatchType, []byte(patchStr))); err != nil {
