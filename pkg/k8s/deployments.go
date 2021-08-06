@@ -59,8 +59,8 @@ func (k *Client) ScaleV1Deployments(ctx context.Context, depl *v1.Deployment, re
 	log.Debug("Start ScaleDownV1Desployments")
 
 	//First compare the time stamps
+	desired_replicas := 0
 	duration := time.Since(repl.CreationTimestamp.Time).Minutes()
-	log.Infof("duration: %v", duration)
 	meltTime, _ := strconv.Atoi(repl.Annotations[suspendAnnotationKey])
 
 	//Scale down the deployment
@@ -83,6 +83,7 @@ func (k *Client) ScaleV1Deployments(ctx context.Context, depl *v1.Deployment, re
 
 	//Scale up the deployment
 	if *depl.Spec.Replicas == 0 && depl.Spec.Template.Labels["icekube.kubernetes.io/frozen"] == "false" {
+			desired_replicas = 1
 			patchStr := fmt.Sprintf(`{"spec":{"replicas": %d}}`, 1)
 			if err := k.runtimeClient.Patch(context.Background(), &v1.Deployment{
 				ObjectMeta: depl.ObjectMeta,
@@ -93,7 +94,7 @@ func (k *Client) ScaleV1Deployments(ctx context.Context, depl *v1.Deployment, re
 	}
 
 	log.WithFields(logrus.Fields{
-		"desired_count":        0,
+		"desired_count":        desired_replicas,
 		"deployment_name":      depl.Name,
 		"deployment_namespace": depl.Namespace,
 	}).Info("Successfully scaled the v1 deployments")
