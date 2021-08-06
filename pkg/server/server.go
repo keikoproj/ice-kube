@@ -6,8 +6,6 @@ import (
 	"github.com/keikoproj/ice-kube/pkg/k8s"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/rest"
-	"strconv"
-	"time"
 )
 
 const (
@@ -66,26 +64,17 @@ func (s *Server) SuspendWorkLoad(ctx context.Context) error {
 			"after-mins-value":     repl.Annotations[suspendAnnotationKey],
 		}).Info("successfully fetched the replica sets")
 
-		//First compare the time stamps
-		duration := time.Since(repl.CreationTimestamp.Time).Minutes()
-		meltTime, _ := strconv.Atoi(repl.Annotations[suspendAnnotationKey])
-		if duration > float64(meltTime) {
-			log.WithFields(logrus.Fields{
-				"time_since": duration,
-				"melt_time":  meltTime,
-			}).Info("Threshold exceeded")
+		// Lets check the flag here
+		// Get the deployment
+		depl, err := s.K8sClient.GetV1Deployment(ctx, repl.Namespace, repl.OwnerReferences[0].Name)
+		if err != nil {
+			log.WithField("error", err.Error()).Error("unable to get the deployments")
+			return err
+		}
 
-			// Lets check the flag here
-			// Get the deployment
-			depl, err := s.K8sClient.GetV1Deployment(ctx, repl.Namespace, repl.OwnerReferences[0].Name)
-			if err != nil {
-				log.WithField("error", err.Error()).Error("unable to get the deployments")
-				return err
-			}
-			if err := s.K8sClient.ScaleV1Deployments(ctx, depl, 0); err != nil {
-				log.WithField("error", err.Error()).Error("unable to scale the deployments")
-				return err
-			}
+		if err := s.K8sClient.ScaleV1Deployments(ctx, depl, &repl); err != nil {
+			log.WithField("error", err.Error()).Error("unable to scale down the deployments")
+			return err
 		}
 
 		//Lets scale the resources
