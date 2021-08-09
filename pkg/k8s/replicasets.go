@@ -52,6 +52,7 @@ type Replica struct {
 func (k *Client) ListV1ReplicaSets(ctx context.Context, labelKey string, labelValue string) (*v1.ReplicaSetList, error) {
 	log := log.Logger(ctx)
 	log.Debug("Start ListV1ReplicaSets")
+
 	opts := client.MatchingLabels{
 		labelKey: labelValue,
 	}
@@ -62,12 +63,13 @@ func (k *Client) ListV1ReplicaSets(ctx context.Context, labelKey string, labelVa
 		log.WithField("error", err.Error()).Error("Error in listing the replica sets")
 		return nil, err
 	}
+
 	log.WithField("count", len(repList.Items)).Info("successfully listed the v1 replica sets")
 	unique := make(map[string]Replica)
 	for i, repl := range repList.Items {
 		revision, _ := strconv.Atoi(repl.Annotations["deployment.kubernetes.io/revision"])
 		for _, own := range repl.OwnerReferences {
-			if repl.OwnerReferences[0].Kind == "Deployment" && *repl.Spec.Replicas != 0 {
+			if repl.OwnerReferences[0].Kind == "Deployment" {
 				if val, ok := unique[own.Name]; ok {
 					if val.Revision < revision {
 						// Revision comparision for existing
@@ -93,6 +95,7 @@ func (k *Client) ListV1ReplicaSets(ctx context.Context, labelKey string, labelVa
 	for _, v := range unique {
 		items = append(items, repList.Items[v.Index])
 	}
+
 	repList.Items = items
 	return &repList, nil
 }

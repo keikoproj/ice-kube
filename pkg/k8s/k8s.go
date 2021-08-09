@@ -58,7 +58,7 @@ type Interface interface {
 	GetV1Deployment(ctx context.Context, ns string, name string) (*v1.Deployment, error)
 	ListV1Deployments(ctx context.Context, labelKey string, labelValue string) (*v1.DeploymentList, error)
 	ListV1Beta2Deployments(ctx context.Context, labelKey string, labelValue string) (*v1beta2.DeploymentList, error)
-	ScaleV1Deployments(ctx context.Context, depl *v1.Deployment, replicas int, value string) error
+	ScaleV1Deployments(ctx context.Context, depl *v1.Deployment, repl *v1.ReplicaSet) error
 	ScaleV1Beta2Deployments(ctx context.Context, depl *v1beta2.Deployment, replicas int) error
 	GetRecentReplicaSet(ctx context.Context, owner string, ns string) (*v1.ReplicaSet, error)
 	ListStateFulSets(ctx context.Context, labelKey string, labelValue string)

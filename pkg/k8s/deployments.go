@@ -9,6 +9,12 @@ import (
 	"k8s.io/api/apps/v1beta2"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"strconv"
+	"time"
+)
+
+const (
+	suspendAnnotationKey = "icekube.kubernetes.io/after-mins"
 )
 
 //ListDeployments functions lists all the deployments with
@@ -48,22 +54,47 @@ func (k *Client) GetV1Deployment(ctx context.Context, ns string, name string) (*
 }
 
 //ScaleDownV1Deployments scales down to the requested replica count
-func (k *Client) ScaleV1Deployments(ctx context.Context, depl *v1.Deployment, replicas int, value string) error {
+func (k *Client) ScaleV1Deployments(ctx context.Context, depl *v1.Deployment, repl *v1.ReplicaSet) error {
 	log := log.Logger(ctx)
-	log.Debug("Start ScaleDownV1Deployments")
+	log.Debug("Start ScaleDownV1Desployments")
 
-	//Prepare the patch to make replica count to desired
+	//First compare the time stamps
+	desired_replicas := 0
+	duration := time.Since(repl.CreationTimestamp.Time).Minutes()
+	meltTime, _ := strconv.Atoi(repl.Annotations[suspendAnnotationKey])
 
-	patchStr := fmt.Sprintf(`{"spec":{"replicas": %d, "template": {"metadata":{"labels":{"icekube.kubernetes.io/frozen": "%s"}}}}}`, replicas, value)
-	if err := k.runtimeClient.Patch(context.Background(), &v1.Deployment{
-		ObjectMeta: depl.ObjectMeta,
-	}, client.RawPatch(types.StrategicMergePatchType, []byte(patchStr))); err != nil {
-		log.WithField("error", err.Error()).Error("Error in scaling deployment replicas")
-		return err
+	//Scale down the deployment
+	if duration > float64(meltTime) {
+		log.WithFields(logrus.Fields{
+			"time_since": duration,
+			"melt_time":  meltTime,
+		}).Info("Threshold exceeded")
+
+		if *depl.Spec.Replicas != 0 && depl.Spec.Template.Labels["icekube.kubernetes.io/suspend"] == "true" {
+			patchStr := fmt.Sprintf(`{"spec":{"replicas": %d, "template": {"metadata":{"labels":{"icekube.kubernetes.io/frozen": "%s"}}}}}`, 0, "true")
+			if err := k.runtimeClient.Patch(context.Background(), &v1.Deployment{
+				ObjectMeta: depl.ObjectMeta,
+			}, client.RawPatch(types.StrategicMergePatchType, []byte(patchStr))); err != nil {
+				log.WithField("error", err.Error()).Error("Error in scaling deployment replicas")
+				return err
+			}
+		}
+	}
+
+	//Scale up the deployment
+	if *depl.Spec.Replicas == 0 && depl.Spec.Template.Labels["icekube.kubernetes.io/frozen"] == "false" {
+			desired_replicas = 1
+			patchStr := fmt.Sprintf(`{"spec":{"replicas": %d}}`, 1)
+			if err := k.runtimeClient.Patch(context.Background(), &v1.Deployment{
+				ObjectMeta: depl.ObjectMeta,
+			}, client.RawPatch(types.StrategicMergePatchType, []byte(patchStr))); err != nil {
+				log.WithField("error", err.Error()).Error("Error in scaling deployment replicas")
+				return err
+			}
 	}
 
 	log.WithFields(logrus.Fields{
-		"desired_count":        replicas,
+		"desired_count":        desired_replicas,
 		"deployment_name":      depl.Name,
 		"deployment_namespace": depl.Namespace,
 	}).Info("Successfully scaled the v1 deployments")
